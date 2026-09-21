@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/driver/mysql"
@@ -21,6 +22,14 @@ type DBConfig struct {
 
 type DB struct {
 	db *gorm.DB
+}
+
+func (receiver *DB) SupportedDialects() []string {
+	return []string{
+		"mysql",
+		"postgres",
+		"sqlite",
+	}
 }
 
 func NewDB(dbConfig DBConfig) (*DB, error) {
@@ -50,7 +59,7 @@ func NewDB(dbConfig DBConfig) (*DB, error) {
 			return nil, fmt.Errorf("failed to connect to database: %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("dialect %s not supported", dialect)
+		return nil, fmt.Errorf("dialect %s not supported, supported dialects: %v", dialect, strings.Join((&DB{}).SupportedDialects(), ", "))
 	}
 
 	if err := db.AutoMigrate(&model.Message{}); err != nil {
@@ -71,7 +80,7 @@ func (receiver *DB) MessageAlreadySent(senderName string, clientMessageID string
 	return cnt > 0, nil
 }
 
-func (receiver *DB) MessageMarkedAsSent(senderName string, msg input.Message) error {
+func (receiver *DB) MessageMarkSendStatus(senderName string, msg input.Message, status int) error {
 	now := time.Now()
 	m := model.Message{
 		ID:              0,
@@ -79,6 +88,7 @@ func (receiver *DB) MessageMarkedAsSent(senderName string, msg input.Message) er
 		ClientMessageID: msg.ClientMessageID,
 		Title:           msg.Title,
 		Content:         msg.Content,
+		SendStatus:      status,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}

@@ -3,12 +3,14 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ismdeep/log"
 	"go.uber.org/zap"
 
 	"github.com/ismdeep/notification-gateway/core/database"
 	"github.com/ismdeep/notification-gateway/core/input"
+	"github.com/ismdeep/notification-gateway/core/model"
 	"github.com/ismdeep/notification-gateway/core/sender"
 )
 
@@ -43,29 +45,34 @@ func (core *Core) processInputMessage(ctx context.Context, msg input.Message) er
 		if err != nil {
 			log.WithContext(ctx).Error("failed to run core.database.MessageAlreadySent",
 				zap.Any("sender", senderName),
+				zap.Any("client_message_id", msg.ClientMessageID),
 				zap.Any("msg", msg),
 				zap.Error(err))
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to run core.database.MessageAlreadySent, sender_name: %v, client_message_id: %v, err: %w", senderName, msg.ClientMessageID, err))
 			continue
 		}
 		if alreadySent {
 			continue
 		}
 
+		sendStatus := model.MessageSendSuccess
 		if err := s.Send(msg); err != nil {
+			sendStatus = model.MessageSendFail
 			log.WithContext(ctx).Error("failed to send message to sender",
 				zap.Any("sender", senderName),
+				zap.Any("client_message_id", msg.ClientMessageID),
 				zap.Any("msg", msg),
 				zap.Error(err))
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to send message to sender, sender_name: %v, client_message_id: %v, err: %w", senderName, msg.ClientMessageID, err))
 		}
 
-		if err := core.database.MessageMarkedAsSent(senderName, msg); err != nil {
+		if err := core.database.MessageMarkSendStatus(senderName, msg, sendStatus); err != nil {
 			log.WithContext(ctx).Error("failed to mark message as sent",
 				zap.Any("sender", senderName),
+				zap.Any("client_message_id", msg.ClientMessageID),
 				zap.Any("msg", msg),
 				zap.Error(err))
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to mark send status, sender_name: %v, client_message_id: %v, err: %w", senderName, msg.ClientMessageID, err))
 			continue
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ismdeep/notification-gateway/core/input"
+	"github.com/ismdeep/notification-gateway/core/model"
 	notificationsender "github.com/ismdeep/notification-gateway/core/sender"
 )
 
@@ -35,6 +36,7 @@ type coreTestDatabase struct {
 type coreTestMark struct {
 	senderName string
 	msg        input.Message
+	status     int
 }
 
 func newCoreTestDatabase() *coreTestDatabase {
@@ -56,8 +58,8 @@ func (d *coreTestDatabase) MessageAlreadySent(senderName string, clientMessageID
 	return d.alreadySent[messageKey(senderName, clientMessageID)], nil
 }
 
-func (d *coreTestDatabase) MessageMarkedAsSent(senderName string, msg input.Message) error {
-	d.marked = append(d.marked, coreTestMark{senderName: senderName, msg: msg})
+func (d *coreTestDatabase) MessageMarkSendStatus(senderName string, msg input.Message, status int) error {
+	d.marked = append(d.marked, coreTestMark{senderName: senderName, msg: msg, status: status})
 	return d.markErr
 }
 
@@ -120,7 +122,7 @@ func TestCore_ProcessInputMessage_Success(t *testing.T) {
 	if len(db.marked) != 1 {
 		t.Fatalf("unexpected marks: %#v", db.marked)
 	}
-	if mark := db.marked[0]; mark.senderName != "test-sender" || mark.msg != msg {
+	if mark := db.marked[0]; mark.senderName != "test-sender" || mark.msg != msg || mark.status != model.MessageSendSuccess {
 		t.Fatalf("unexpected mark: %#v", mark)
 	}
 }
@@ -177,7 +179,7 @@ func TestCore_ProcessInputMessage_SendErrorStillMarksSent(t *testing.T) {
 	if len(sender.sent) != 1 {
 		t.Fatalf("expected one send attempt, got %#v", sender.sent)
 	}
-	if len(db.marked) != 1 || db.marked[0].msg != msg {
+	if len(db.marked) != 1 || db.marked[0].msg != msg || db.marked[0].status != model.MessageSendFail {
 		t.Fatalf("expected message to be marked after send error, got %#v", db.marked)
 	}
 }

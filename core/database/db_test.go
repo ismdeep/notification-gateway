@@ -68,7 +68,7 @@ func TestNewDB_UnsupportedDialect(t *testing.T) {
 		DSN:     "oracle://user:pass@127.0.0.1:1521/service",
 	})
 	assert.Nil(t, db)
-	assert.EqualError(t, err, "dialect oracle not supported")
+	assert.EqualError(t, err, "dialect oracle not supported, supported dialects: mysql, postgres, sqlite")
 }
 
 func TestMessageAlreadySent(t *testing.T) {
@@ -83,7 +83,7 @@ func TestMessageAlreadySent(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, sent)
 
-	assert.NoError(t, db.MessageMarkedAsSent("sender", msg))
+	assert.NoError(t, db.MessageMarkSendStatus("sender", msg, model.MessageSendSuccess))
 
 	sent, err = db.MessageAlreadySent("sender", msg.ClientMessageID)
 	assert.NoError(t, err)
@@ -115,7 +115,7 @@ func TestMessageMarkedAsSent(t *testing.T) {
 		Content:         "content",
 	}
 
-	err := db.MessageMarkedAsSent("sender", msg)
+	err := db.MessageMarkSendStatus("sender", msg, model.MessageSendSuccess)
 	assert.NoError(t, err)
 
 	stored, ok := testDriver.message("sender", msg.ClientMessageID)
@@ -124,6 +124,7 @@ func TestMessageMarkedAsSent(t *testing.T) {
 	assert.Equal(t, msg.ClientMessageID, stored.ClientMessageID)
 	assert.Equal(t, msg.Title, stored.Title)
 	assert.Equal(t, msg.Content, stored.Content)
+	assert.Equal(t, model.MessageSendSuccess, stored.SendStatus)
 	assert.False(t, stored.CreatedAt.IsZero())
 	assert.False(t, stored.UpdatedAt.IsZero())
 }
@@ -132,7 +133,7 @@ func TestMessageMarkedAsSent_CreateError(t *testing.T) {
 	db := newTestDB(t)
 	testDriver.setExecError(errors.New("create failed"))
 
-	err := db.MessageMarkedAsSent("sender", input.Message{ClientMessageID: "client-message-id"})
+	err := db.MessageMarkSendStatus("sender", input.Message{ClientMessageID: "client-message-id"}, model.MessageSendFail)
 	assert.EqualError(t, err, "failed to mark message as sent: create failed")
 }
 
@@ -264,7 +265,7 @@ func (c *fakeConn) ExecContext(_ context.Context, query string, args []driver.Na
 	if !strings.HasPrefix(query, "INSERT INTO `messages`") {
 		return nil, fmt.Errorf("unexpected query: %s", query)
 	}
-	if len(args) < 6 {
+	if len(args) < 7 {
 		return nil, fmt.Errorf("unexpected query args: %v", args)
 	}
 
@@ -273,8 +274,9 @@ func (c *fakeConn) ExecContext(_ context.Context, query string, args []driver.Na
 		ClientMessageID: args[1].Value.(string),
 		Title:           args[2].Value.(string),
 		Content:         args[3].Value.(string),
-		CreatedAt:       args[4].Value.(time.Time),
-		UpdatedAt:       args[5].Value.(time.Time),
+		SendStatus:      int(args[4].Value.(int64)),
+		CreatedAt:       args[5].Value.(time.Time),
+		UpdatedAt:       args[6].Value.(time.Time),
 	}
 
 	c.driver.store(msg)

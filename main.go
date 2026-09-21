@@ -60,6 +60,11 @@ func main() {
 				panic("email name is required")
 			}
 			senders = append(senders, &sc.Email)
+		case "telegram":
+			if sc.Telegram.Name == "" {
+				panic("telegram name is required")
+			}
+			senders = append(senders, &sc.Telegram)
 		case "output":
 			if sc.Output.Name == "" {
 				panic("output name is required")

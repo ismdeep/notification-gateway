@@ -8,8 +8,9 @@ type Sender interface {
 }
 
 type Config struct {
-	Type   string `yaml:"type"`
-	Wecom  Wecom  `yaml:"wecom"`
-	Email  Email  `yaml:"email"`
-	Output Output `yaml:"output"`
+	Type     string   `yaml:"type"`
+	Wecom    Wecom    `yaml:"wecom"`
+	Email    Email    `yaml:"email"`
+	Telegram Telegram `yaml:"telegram"`
+	Output   Output   `yaml:"output"`
 }

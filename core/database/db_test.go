@@ -71,6 +71,28 @@ func TestNewDB_UnsupportedDialect(t *testing.T) {
 	assert.EqualError(t, err, "dialect oracle not supported, supported dialects: mysql, postgres, sqlite")
 }
 
+func TestDBSupportedDialects(t *testing.T) {
+	assert.Equal(t, []string{"mysql", "postgres", "sqlite"}, (&DB{}).SupportedDialects())
+}
+
+func TestNewDB_SQLite(t *testing.T) {
+	db, err := NewDB(DBConfig{Dialect: "sqlite", DSN: "file::memory:?cache=shared"})
+	if err != nil {
+		t.Fatalf("NewDB returned error: %v", err)
+	}
+	if db == nil || db.db == nil {
+		t.Fatal("NewDB returned an uninitialized DB")
+	}
+	msg := input.Message{ClientMessageID: "sqlite-client", Title: "title", Content: "content"}
+	if err := db.MessageMarkSendStatus("sqlite", msg, model.MessageSendSuccess); err != nil {
+		t.Fatalf("mark message: %v", err)
+	}
+	sent, err := db.MessageAlreadySent("sqlite", msg.ClientMessageID)
+	if err != nil || !sent {
+		t.Fatalf("MessageAlreadySent = %v, %v; want true, nil", sent, err)
+	}
+}
+
 func TestMessageAlreadySent(t *testing.T) {
 	db := newTestDB(t)
 	msg := input.Message{

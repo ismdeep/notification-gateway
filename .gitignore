@@ -9,3 +9,6 @@
 
 # data.db
 /data.db
+
+# coverage.out
+/coverage.out

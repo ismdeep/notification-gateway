@@ -1,0 +1,11 @@
+# JetBrains
+/.idea/
+
+# macOS
+.DS_Store
+
+# build
+/build/
+
+# data.db
+/data.db

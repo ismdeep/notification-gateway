@@ -1,0 +1,13 @@
+rest:
+  bind: 127.0.0.1
+  port: 39498
+  authorization: example
+
+db:
+  dialect: sqlite
+  dsn: data.db
+
+senders:
+  - type: output
+    output:
+      name: stdout

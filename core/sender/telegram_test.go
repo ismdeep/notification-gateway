@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -24,8 +25,9 @@ type telegramRequest struct {
 }
 
 func TestTelegram_GetName(t *testing.T) {
+	ctx := context.Background()
 	telegram := &Telegram{Name: "telegram-sender", BotToken: "token", ChatID: "chat-id"}
-	assert.Equal(t, "telegram-sender", telegram.GetName())
+	assert.Equal(t, "telegram-sender", telegram.GetName(ctx))
 }
 
 func newTelegramTestServer(t *testing.T) (*httptest.Server, chan telegramRequest) {
@@ -58,11 +60,12 @@ func newTelegramTestServer(t *testing.T) (*httptest.Server, chan telegramRequest
 }
 
 func TestTelegram_Send(t *testing.T) {
+	ctx := context.Background()
 	server, requests := newTelegramTestServer(t)
 	telegram := &Telegram{Name: "telegram", BotToken: "token", ChatID: "-1001234567890"}
 	telegram.endpoint = server.URL + "/bottoken/sendMessage"
 
-	err := telegram.Send(input.Message{
+	err := telegram.Send(ctx, input.Message{
 		ClientMessageID: "test-client-message-id-001",
 		Title:           "Foo",
 		Content:         "Bar",
@@ -77,6 +80,7 @@ func TestTelegram_Send(t *testing.T) {
 }
 
 func TestTelegram_SendContent(t *testing.T) {
+	ctx := context.Background()
 	tests := []struct {
 		name    string
 		title   string
@@ -115,7 +119,7 @@ func TestTelegram_SendContent(t *testing.T) {
 			telegram := &Telegram{Name: "telegram", BotToken: "token", ChatID: "chat-id"}
 			telegram.endpoint = server.URL + "/bottoken/sendMessage"
 
-			err := telegram.Send(input.Message{Title: test.title, Content: test.content})
+			err := telegram.Send(ctx, input.Message{Title: test.title, Content: test.content})
 			assert.NoError(t, err)
 			assert.Equal(t, test.want, (<-requests).Payload.Text)
 		})
@@ -123,6 +127,7 @@ func TestTelegram_SendContent(t *testing.T) {
 }
 
 func TestTelegram_SendValidationErrors(t *testing.T) {
+	ctx := context.Background()
 	tests := []struct {
 		name     string
 		telegram *Telegram
@@ -142,13 +147,14 @@ func TestTelegram_SendValidationErrors(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := test.telegram.Send(input.Message{Title: "Foo", Content: "Bar"})
+			err := test.telegram.Send(ctx, input.Message{Title: "Foo", Content: "Bar"})
 			assert.ErrorContains(t, err, test.want)
 		})
 	}
 }
 
 func TestTelegram_Send_NetworkError(t *testing.T) {
+	ctx := context.Background()
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = writer.Write([]byte(`{"ok":true}`))
 	}))
@@ -157,11 +163,12 @@ func TestTelegram_Send_NetworkError(t *testing.T) {
 	telegram := &Telegram{Name: "telegram", BotToken: "token", ChatID: "chat-id"}
 	telegram.endpoint = server.URL + "/bottoken/sendMessage"
 
-	err := telegram.Send(input.Message{Title: "Foo", Content: "Bar"})
+	err := telegram.Send(ctx, input.Message{Title: "Foo", Content: "Bar"})
 	assert.ErrorContains(t, err, "send telegram request")
 }
 
 func TestTelegram_SendErrorResponses(t *testing.T) {
+	ctx := context.Background()
 	tests := []struct {
 		name       string
 		statusCode int
@@ -198,7 +205,7 @@ func TestTelegram_SendErrorResponses(t *testing.T) {
 
 			telegram := &Telegram{Name: "telegram", BotToken: "token", ChatID: "chat-id"}
 			telegram.endpoint = server.URL + "/bottoken/sendMessage"
-			err := telegram.Send(input.Message{Title: "Foo", Content: "Bar"})
+			err := telegram.Send(ctx, input.Message{Title: "Foo", Content: "Bar"})
 			assert.ErrorContains(t, err, test.want)
 		})
 	}

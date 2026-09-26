@@ -13,12 +13,12 @@ type Output struct {
 	Name string `json:"name" yaml:"name"`
 }
 
-func (receiver *Output) GetName() string {
+func (receiver *Output) GetName(ctx context.Context) string {
 	return receiver.Name
 }
 
-func (receiver *Output) Send(msg input.Message) error {
-	log.WithContext(context.Background()).Info("send",
+func (receiver *Output) Send(ctx context.Context, msg input.Message) error {
+	log.WithContext(ctx).Info("send",
 		zap.Any("name", receiver.Name),
 		zap.Any("msg", msg))
 	return nil

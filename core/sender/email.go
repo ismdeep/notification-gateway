@@ -2,6 +2,7 @@ package sender
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -26,11 +27,11 @@ type Email struct {
 	To       []string `yaml:"to"`
 }
 
-func (receiver *Email) GetName() string {
+func (receiver *Email) GetName(ctx context.Context) string {
 	return receiver.Name
 }
 
-func (receiver *Email) Send(msg input.Message) error {
+func (receiver *Email) Send(ctx context.Context, msg input.Message) error {
 	if receiver.Host == "" {
 		return fmt.Errorf("email smtp host is empty")
 	}

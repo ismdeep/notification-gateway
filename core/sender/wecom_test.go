@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -20,8 +21,9 @@ type wecomPayload struct {
 }
 
 func TestWecom_GetName(t *testing.T) {
+	ctx := context.Background()
 	wecom := &Wecom{Name: "wecom-sender", Endpoint: "https://example.com/webhook"}
-	assert.Equal(t, "wecom-sender", wecom.GetName())
+	assert.Equal(t, "wecom-sender", wecom.GetName(ctx))
 }
 
 func newWecomTestServer(t *testing.T) (*httptest.Server, chan wecomPayload) {
@@ -50,10 +52,12 @@ func newWecomTestServer(t *testing.T) (*httptest.Server, chan wecomPayload) {
 }
 
 func TestWecom_Send(t *testing.T) {
+	ctx := context.Background()
+
 	server, payloads := newWecomTestServer(t)
 	wecom := &Wecom{Name: "wecom", Endpoint: server.URL}
 
-	err := wecom.Send(input.Message{
+	err := wecom.Send(ctx, input.Message{
 		ClientMessageID: "test-client-message-id-001",
 		Title:           "Foo",
 		Content:         "Bar",
@@ -66,6 +70,8 @@ func TestWecom_Send(t *testing.T) {
 }
 
 func TestWecom_SendContent(t *testing.T) {
+	ctx := context.Background()
+
 	tests := []struct {
 		name    string
 		title   string
@@ -103,7 +109,7 @@ func TestWecom_SendContent(t *testing.T) {
 			server, payloads := newWecomTestServer(t)
 			wecom := &Wecom{Name: "wecom", Endpoint: server.URL}
 
-			err := wecom.Send(input.Message{Title: test.title, Content: test.content})
+			err := wecom.Send(ctx, input.Message{Title: test.title, Content: test.content})
 			assert.NoError(t, err)
 			assert.Equal(t, test.want, (<-payloads).Text.Content)
 		})
@@ -111,13 +117,17 @@ func TestWecom_SendContent(t *testing.T) {
 }
 
 func TestWecom_Send_InvalidEndpoint(t *testing.T) {
+	ctx := context.Background()
+
 	wecom := &Wecom{Name: "wecom", Endpoint: "://bad-endpoint"}
 
-	err := wecom.Send(input.Message{Title: "Foo", Content: "Bar"})
+	err := wecom.Send(ctx, input.Message{Title: "Foo", Content: "Bar"})
 	assert.ErrorContains(t, err, "create wecom request")
 }
 
 func TestWecom_Send_NetworkError(t *testing.T) {
+	ctx := context.Background()
+
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = writer.Write([]byte(`{"errcode":0,"errmsg":"ok"}`))
 	}))
@@ -125,11 +135,13 @@ func TestWecom_Send_NetworkError(t *testing.T) {
 
 	wecom := &Wecom{Name: "wecom", Endpoint: server.URL}
 
-	err := wecom.Send(input.Message{Title: "Foo", Content: "Bar"})
+	err := wecom.Send(ctx, input.Message{Title: "Foo", Content: "Bar"})
 	assert.ErrorContains(t, err, "send wecom request")
 }
 
 func TestWecom_SendErrorResponses(t *testing.T) {
+	ctx := context.Background()
+
 	tests := []struct {
 		name       string
 		statusCode int
@@ -165,7 +177,7 @@ func TestWecom_SendErrorResponses(t *testing.T) {
 			t.Cleanup(server.Close)
 
 			wecom := &Wecom{Name: "wecom", Endpoint: server.URL}
-			err := wecom.Send(input.Message{Title: "Foo", Content: "Bar"})
+			err := wecom.Send(ctx, input.Message{Title: "Foo", Content: "Bar"})
 			assert.ErrorContains(t, err, test.want)
 		})
 	}

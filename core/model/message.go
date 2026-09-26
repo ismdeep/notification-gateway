@@ -14,10 +14,24 @@ type Message struct {
 }
 
 const (
-	MessageSendSuccess = 1
-	MessageSendFail    = 2
+	MessageSendPending = 1
+	MessageSendSuccess = 2
+	MessageSendFail    = 3
 )
 
 func (receiver *Message) TableName() string {
 	return "messages"
+}
+
+func MessageSendStatusText(status int) string {
+	switch status {
+	case MessageSendPending:
+		return "pending"
+	case MessageSendSuccess:
+		return "success"
+	case MessageSendFail:
+		return "fail"
+	default:
+		return "unknow"
+	}
 }

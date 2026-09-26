@@ -2,6 +2,7 @@ package sender
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,11 +19,11 @@ type Telegram struct {
 	endpoint string
 }
 
-func (receiver *Telegram) GetName() string {
+func (receiver *Telegram) GetName(ctx context.Context) string {
 	return receiver.Name
 }
 
-func (receiver *Telegram) Send(msg input.Message) error {
+func (receiver *Telegram) Send(ctx context.Context, msg input.Message) error {
 	if receiver.BotToken == "" {
 		return fmt.Errorf("telegram bot token is empty")
 	}

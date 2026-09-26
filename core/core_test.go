@@ -16,11 +16,11 @@ type coreTestSender struct {
 	sent    []input.Message
 }
 
-func (s *coreTestSender) GetName() string {
+func (s *coreTestSender) GetName(ctx context.Context) string {
 	return s.name
 }
 
-func (s *coreTestSender) Send(msg input.Message) error {
+func (s *coreTestSender) Send(ctx context.Context, msg input.Message) error {
 	s.sent = append(s.sent, msg)
 	return s.sendErr
 }

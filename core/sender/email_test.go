@@ -2,6 +2,7 @@ package sender
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
 	"net"
 	"strconv"
@@ -23,6 +24,8 @@ type smtpTestServer struct {
 }
 
 func TestEmail_GetName(t *testing.T) {
+	ctx := context.Background()
+
 	email := Email{
 		Name:     "email-sender",
 		Host:     "smtp.example.com",
@@ -32,7 +35,7 @@ func TestEmail_GetName(t *testing.T) {
 		From:     "sender@example.com",
 		To:       []string{"receiver@example.com"},
 	}
-	assert.Equal(t, "email-sender", email.GetName())
+	assert.Equal(t, "email-sender", email.GetName(ctx))
 }
 
 func newSMTPTestServer(t *testing.T) *smtpTestServer {
@@ -134,6 +137,8 @@ func (server *smtpTestServer) serve() {
 }
 
 func TestEmail_Send(t *testing.T) {
+	ctx := context.Background()
+
 	server := newSMTPTestServer(t)
 	email := Email{
 		Name:     "email-sender",
@@ -145,7 +150,7 @@ func TestEmail_Send(t *testing.T) {
 		To:       []string{"receiver@example.com"},
 	}
 
-	err := email.Send(input.Message{
+	err := email.Send(ctx, input.Message{
 		ClientMessageID: "test-client-message-id-001",
 		Title:           "Hello",
 		Content:         "World",
@@ -160,6 +165,7 @@ func TestEmail_Send(t *testing.T) {
 }
 
 func TestEmail_SendWithAuth(t *testing.T) {
+	ctx := context.Background()
 	server := newSMTPTestServer(t)
 	email := Email{
 		Name:     "email",
@@ -171,7 +177,7 @@ func TestEmail_SendWithAuth(t *testing.T) {
 		To:       []string{"receiver@example.com"},
 	}
 
-	err := email.Send(input.Message{
+	err := email.Send(ctx, input.Message{
 		ClientMessageID: "test-client-message-id-002",
 		Title:           "Hello",
 		Content:         "World",
@@ -190,6 +196,8 @@ func TestEmail_SendWithAuth(t *testing.T) {
 }
 
 func TestEmail_Send_SMTPError(t *testing.T) {
+	ctx := context.Background()
+
 	server := newSMTPTestServer(t)
 	_ = server.listener.Close()
 
@@ -203,11 +211,13 @@ func TestEmail_Send_SMTPError(t *testing.T) {
 		To:       []string{"receiver@example.com"},
 	}
 
-	err := email.Send(input.Message{Title: "Foo", Content: "Bar"})
+	err := email.Send(ctx, input.Message{Title: "Foo", Content: "Bar"})
 	assert.ErrorContains(t, err, "send email")
 }
 
 func TestEmail_SendValidationErrors(t *testing.T) {
+	ctx := context.Background()
+
 	tests := []struct {
 		name  string
 		email *Email
@@ -247,7 +257,7 @@ func TestEmail_SendValidationErrors(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := test.email.Send(input.Message{Title: "Foo", Content: "Bar"})
+			err := test.email.Send(ctx, input.Message{Title: "Foo", Content: "Bar"})
 			assert.ErrorContains(t, err, test.want)
 		})
 	}

@@ -1,10 +1,14 @@
 package sender
 
-import "github.com/ismdeep/notification-gateway/core/input"
+import (
+	"context"
+
+	"github.com/ismdeep/notification-gateway/core/input"
+)
 
 type Sender interface {
-	GetName() string
-	Send(msg input.Message) error
+	GetName(ctx context.Context) string
+	Send(ctx context.Context, msg input.Message) error
 }
 
 type Config struct {

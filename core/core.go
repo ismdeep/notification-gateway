@@ -40,7 +40,7 @@ func (core *Core) Run(ctx context.Context) error {
 func (core *Core) processInputMessage(ctx context.Context, msg input.Message) error {
 	var errs []error
 	for _, s := range core.senders {
-		senderName := s.GetName()
+		senderName := s.GetName(ctx)
 		alreadySent, err := core.database.MessageAlreadySent(senderName, msg.ClientMessageID)
 		if err != nil {
 			log.WithContext(ctx).Error("failed to run core.database.MessageAlreadySent",
@@ -55,16 +55,24 @@ func (core *Core) processInputMessage(ctx context.Context, msg input.Message) er
 			continue
 		}
 
-		sendStatus := model.MessageSendSuccess
-		if err := s.Send(msg); err != nil {
+		sendStatus := model.MessageSendPending
+		log.WithContext(ctx).Info("send message",
+			zap.Any("sender", senderName),
+			zap.Any("client_message_id", msg.ClientMessageID),
+			zap.String("status", model.MessageSendStatusText(sendStatus)),
+		)
+		err = s.Send(ctx, msg)
+		if err != nil {
 			sendStatus = model.MessageSendFail
-			log.WithContext(ctx).Error("failed to send message to sender",
-				zap.Any("sender", senderName),
-				zap.Any("client_message_id", msg.ClientMessageID),
-				zap.Any("msg", msg),
-				zap.Error(err))
 			errs = append(errs, fmt.Errorf("failed to send message to sender, sender_name: %v, client_message_id: %v, err: %w", senderName, msg.ClientMessageID, err))
+		} else {
+			sendStatus = model.MessageSendSuccess
 		}
+		log.WithContext(ctx).Info("send message",
+			zap.Any("sender", senderName),
+			zap.Any("client_message_id", msg.ClientMessageID),
+			zap.String("status", model.MessageSendStatusText(sendStatus)),
+			zap.Any("err", err))
 
 		if err := core.database.MessageMarkSendStatus(senderName, msg, sendStatus); err != nil {
 			log.WithContext(ctx).Error("failed to mark message as sent",

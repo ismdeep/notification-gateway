@@ -2,6 +2,7 @@ package sender
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,11 +17,11 @@ type Wecom struct {
 	Endpoint string
 }
 
-func (receiver *Wecom) GetName() string {
+func (receiver *Wecom) GetName(ctx context.Context) string {
 	return receiver.Name
 }
 
-func (receiver *Wecom) Send(msg input.Message) error {
+func (receiver *Wecom) Send(ctx context.Context, msg input.Message) error {
 	content := msg.Title
 	if msg.Content != "" {
 		if content != "" {

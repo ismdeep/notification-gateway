@@ -2,17 +2,19 @@
 
 set -e
 
+endpoint="${NOTIFICATION_GATEWAY_ENDPOINT:-"http://127.0.0.1:39498"}"
+authorization="${NOTIFICATION_GATEWAY_AUTHORIZATION:-"example"}"
 
 run_once() {
   client_message_id="test.$(openssl rand -hex 20)"
   curl -fsSL -X POST \
-    --header 'Authorization: example' \
+    --header "Authorization: ${authorization}" \
     --data '{
     "client_message_id": "'"${client_message_id}"'",
     "title": "Hello",
     "content": "World."
   }' \
-    http://127.0.0.1:39498/messages
+    "${endpoint}/messages"
   echo ''
 }
 

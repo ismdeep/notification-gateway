@@ -2,7 +2,9 @@ package sender
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
+	"io"
 	"mime"
 	"net"
 	"net/mail"
@@ -14,13 +16,14 @@ import (
 )
 
 type Email struct {
-	Name     string
-	Host     string
-	Port     int
-	Username string
-	Password string
-	From     string
-	To       []string
+	Name     string   `yaml:"name"`
+	Host     string   `yaml:"host"`
+	Port     int      `yaml:"port"`
+	SSL      bool     `yaml:"ssl"`
+	Username string   `yaml:"username"`
+	Password string   `yaml:"password"`
+	From     string   `yaml:"from"`
+	To       []string `yaml:"to"`
 }
 
 func (receiver *Email) GetName() string {
@@ -70,9 +73,56 @@ func (receiver *Email) Send(msg input.Message) error {
 	}
 
 	address := net.JoinHostPort(receiver.Host, strconv.Itoa(receiver.Port))
-	if err := smtp.SendMail(address, auth, from.Address, recipients, body.Bytes()); err != nil {
+	if err := receiver.sendMail(address, auth, from.Address, recipients, body.Bytes()); err != nil {
 		return fmt.Errorf("send email: %w", err)
 	}
 
 	return nil
+}
+
+// sendMail sends a message over SMTP. When SSL is enabled, the connection is
+// established with TLS immediately (implicit TLS, as used by port 465).
+func (receiver *Email) sendMail(address string, auth smtp.Auth, from string, recipients []string, body []byte) error {
+	if !receiver.SSL {
+		return smtp.SendMail(address, auth, from, recipients, body)
+	}
+
+	conn, err := tls.Dial("tcp", address, &tls.Config{ServerName: receiver.Host})
+	if err != nil {
+		return err
+	}
+
+	client, err := smtp.NewClient(conn, receiver.Host)
+	if err != nil {
+		_ = conn.Close()
+		return err
+	}
+	defer func() { _ = client.Close() }()
+
+	if auth != nil {
+		if err := client.Auth(auth); err != nil {
+			return err
+		}
+	}
+	if err := client.Mail(from); err != nil {
+		return err
+	}
+	for _, recipient := range recipients {
+		if err := client.Rcpt(recipient); err != nil {
+			return err
+		}
+	}
+
+	writer, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(writer, bytes.NewReader(body)); err != nil {
+		_ = writer.Close()
+		return err
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+	return client.Quit()
 }

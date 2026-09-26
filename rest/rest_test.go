@@ -17,7 +17,7 @@ func TestRestMessagesRequiresAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := httptest.NewRequest(http.MethodPost, "/messages", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/messages", nil)
 	resp := httptest.NewRecorder()
 	r.eng.ServeHTTP(resp, req)
 	if resp.Code != http.StatusUnauthorized {

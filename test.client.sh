@@ -14,7 +14,7 @@ run_once() {
     "title": "Hello",
     "content": "World."
   }' \
-    "${endpoint}/messages"
+    "${endpoint}/api/v1/messages"
   echo ''
 }
 

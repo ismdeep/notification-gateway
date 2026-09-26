@@ -22,6 +22,7 @@ type Rest struct {
 	cfg       Config
 	inputChan chan input.Message
 	eng       *gin.Engine
+	server    *http.Server
 }
 
 func NewRest(ctx context.Context, config Config, inputChan chan input.Message) (*Rest, error) {
@@ -33,6 +34,10 @@ func NewRest(ctx context.Context, config Config, inputChan chan input.Message) (
 	if err := r.initRoute(ctx); err != nil {
 		log.WithContext(ctx).Error("init route failed", zap.Error(err))
 		return nil, err
+	}
+	r.server = &http.Server{
+		Addr:    fmt.Sprintf("%v:%v", r.cfg.Bind, r.cfg.Port),
+		Handler: r.eng,
 	}
 	return r, nil
 }
@@ -67,5 +72,23 @@ func (r *Rest) initRoute(ctx context.Context) error {
 
 func (r *Rest) Run(ctx context.Context) error {
 	log.WithContext(ctx).Info("rest start", zap.String("bind", r.cfg.Bind), zap.Int("port", r.cfg.Port))
-	return r.eng.Run(fmt.Sprintf("%v:%v", r.cfg.Bind, r.cfg.Port))
+	if r.server == nil {
+		r.server = &http.Server{
+			Addr:    fmt.Sprintf("%v:%v", r.cfg.Bind, r.cfg.Port),
+			Handler: r.eng,
+		}
+	}
+	if err := r.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+	return nil
+}
+
+// Shutdown stops accepting new requests and waits for in-flight requests to
+// finish until ctx is cancelled.
+func (r *Rest) Shutdown(ctx context.Context) error {
+	if r.server == nil {
+		return nil
+	}
+	return r.server.Shutdown(ctx)
 }

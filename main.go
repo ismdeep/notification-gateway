@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/ismdeep/log"
 	"go.uber.org/zap"
@@ -19,7 +21,8 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	log.Init("console://[stdout]?level=debug&time_encoder=rfc3339&trace_level=fatal")
 
@@ -37,7 +40,7 @@ func main() {
 	}
 
 	// 准备管道
-	inputChan := make(chan input.Message, 65535)
+	inputChan := make(chan input.Message, 1024)
 
 	// 连接数据库
 	log.WithContext(ctx).Info("connecting to database ...")
@@ -78,7 +81,13 @@ func main() {
 	// 创建并启动 core
 	log.WithContext(ctx).Info("starting core ...")
 	c := core.NewCore(inputChan, senders, db)
-	go func() { _ = c.Run(ctx) }()
+	coreDone := make(chan struct{})
+	go func() {
+		defer close(coreDone)
+		if err := c.Run(ctx); err != nil {
+			log.WithContext(ctx).Error("core stopped with error", zap.Error(err))
+		}
+	}()
 
 	// 创建 rest 服务
 	r, err := rest.NewRest(ctx, cfg.Rest, inputChan)
@@ -88,7 +97,32 @@ func main() {
 
 	// 启动 rest 服务
 	log.WithContext(ctx).Info("starting rest ...")
-	if err := r.Run(ctx); err != nil {
-		panic(fmt.Errorf("failed to start rest server: %w", err))
+	restErr := make(chan error, 1)
+	go func() { restErr <- r.Run(ctx) }()
+
+	select {
+	case err := <-restErr:
+		if err != nil {
+			log.WithContext(ctx).Error("rest stopped with error", zap.Error(err))
+			log.WithContext(ctx).Info("close inputChan ...")
+			close(inputChan)
+			<-coreDone
+			log.WithContext(ctx).Info("inputChan processing completed")
+			panic(fmt.Errorf("failed to start rest server: %w", err))
+		}
+	case <-ctx.Done():
+		log.WithContext(ctx).Info("shutting down ...")
+		// Wait for all in-flight HTTP handlers to finish before closing the
+		// input channel; otherwise a handler could send to a closed channel.
+		if err := r.Shutdown(context.Background()); err != nil {
+			log.WithContext(ctx).Warn("failed to shutdown rest server", zap.Error(err))
+		}
+		log.WithContext(ctx).Info("close inputChan ...")
+		close(inputChan)
+		<-coreDone
+		log.WithContext(ctx).Info("inputChan processing completed")
+		if err := <-restErr; err != nil {
+			log.WithContext(ctx).Warn("rest server stopped with error", zap.Error(err))
+		}
 	}
 }

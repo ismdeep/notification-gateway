@@ -1,13 +1,8 @@
-FROM debian:13
+FROM kopeisec/debian:13
 
 ARG TARGETARCH
 
 ENV TZ=Asia/Shanghai
-
-RUN \
-    apt-get update && \
-    apt-get upgrade -qq -y && \
-    apt-get install -qq -y ca-certificates tzdata
 
 WORKDIR /app
 

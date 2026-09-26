@@ -24,6 +24,7 @@ type Email struct {
 	Username string   `yaml:"username"`
 	Password string   `yaml:"password"`
 	From     string   `yaml:"from"`
+	Nickname string   `yaml:"nickname"`
 	To       []string `yaml:"to"`
 }
 
@@ -48,6 +49,10 @@ func (receiver *Email) Send(ctx context.Context, msg input.Message) error {
 	from, err := mail.ParseAddress(receiver.From)
 	if err != nil {
 		return fmt.Errorf("parse email from address: %w", err)
+	}
+	from.Name = receiver.Nickname
+	if from.Name == "" {
+		from.Name = from.Address
 	}
 
 	recipients := make([]string, 0, len(receiver.To))

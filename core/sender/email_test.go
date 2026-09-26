@@ -158,10 +158,30 @@ func TestEmail_Send(t *testing.T) {
 	assert.NoError(t, err)
 
 	data := <-server.data
-	assert.Contains(t, data, "From: <sender@example.com>")
+	assert.Contains(t, data, `From: "sender@example.com" <sender@example.com>`)
 	assert.Contains(t, data, "To: receiver@example.com")
 	assert.Contains(t, data, "Subject: Hello")
 	assert.Contains(t, data, "World")
+}
+
+func TestEmail_SendWithNickname(t *testing.T) {
+	ctx := context.Background()
+
+	server := newSMTPTestServer(t)
+	email := Email{
+		Name:     "email-sender",
+		Host:     server.host,
+		Port:     server.port,
+		From:     "sender@example.com",
+		Nickname: "Notification Gateway",
+		To:       []string{"receiver@example.com"},
+	}
+
+	err := email.Send(ctx, input.Message{Title: "Hello", Content: "World"})
+	assert.NoError(t, err)
+
+	data := <-server.data
+	assert.Contains(t, data, `From: "Notification Gateway" <sender@example.com>`)
 }
 
 func TestEmail_SendWithAuth(t *testing.T) {

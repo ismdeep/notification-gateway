@@ -57,16 +57,7 @@ func (r *Rest) initRoute(ctx context.Context) error {
 		log.WithContext(ctx).Warn("authorization is not set")
 	}
 
-	r.eng.POST("/messages", func(c *gin.Context) {
-		var msg input.Message
-		if err := c.ShouldBindJSON(&msg); err != nil {
-			log.WithContext(ctx).Error("bind message failed", zap.Error(err))
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"msg": ErrRequestBindJSON.Error()})
-			return
-		}
-		r.inputChan <- msg
-		c.JSON(http.StatusOK, gin.H{"msg": "ok"})
-	})
+	r.eng.POST("/api/v1/messages", r.PushMessage)
 	return nil
 }
 

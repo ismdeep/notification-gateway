@@ -34,7 +34,7 @@ func TestRestMessagesRejectsInvalidJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := httptest.NewRequest(http.MethodPost, "/messages", bytes.NewBufferString("not-json"))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/messages", bytes.NewBufferString("not-json"))
 	req.Header.Set("Authorization", "secret")
 	resp := httptest.NewRecorder()
 	r.eng.ServeHTTP(resp, req)
@@ -57,7 +57,7 @@ func TestRestMessagesQueuesValidMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := httptest.NewRequest(http.MethodPost, "/messages", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/messages", bytes.NewReader(body))
 	resp := httptest.NewRecorder()
 	r.eng.ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {

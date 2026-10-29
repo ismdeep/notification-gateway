@@ -8,12 +8,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/ismdeep/notification-gateway/core"
 	"github.com/ismdeep/notification-gateway/core/input"
 )
 
 func TestRestMessagesRequiresAuthorization(t *testing.T) {
 	messages := make(chan input.Message, 1)
-	r, err := NewRest(context.Background(), Config{Authorization: "secret"}, messages)
+	r, err := NewRest(context.Background(), Config{Authorization: "secret"}, messages, &core.Core{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +31,7 @@ func TestRestMessagesRequiresAuthorization(t *testing.T) {
 
 func TestRestMessagesRejectsInvalidJSON(t *testing.T) {
 	messages := make(chan input.Message, 1)
-	r, err := NewRest(context.Background(), Config{Authorization: "secret"}, messages)
+	r, err := NewRest(context.Background(), Config{Authorization: "secret"}, messages, &core.Core{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +49,7 @@ func TestRestMessagesRejectsInvalidJSON(t *testing.T) {
 
 func TestRestMessagesQueuesValidMessage(t *testing.T) {
 	messages := make(chan input.Message, 1)
-	r, err := NewRest(context.Background(), Config{}, messages)
+	r, err := NewRest(context.Background(), Config{}, messages, &core.Core{})
 	if err != nil {
 		t.Fatal(err)
 	}

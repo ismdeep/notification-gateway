@@ -17,14 +17,14 @@ import (
 type Core struct {
 	inputChan chan input.Message
 	senders   []sender.Sender
-	database  database.Database
+	Database  database.Database
 }
 
 func NewCore(inputChan chan input.Message, senders []sender.Sender, database database.Database) *Core {
 	return &Core{
 		inputChan: inputChan,
 		senders:   senders,
-		database:  database,
+		Database:  database,
 	}
 }
 
@@ -41,7 +41,7 @@ func (core *Core) processInputMessage(ctx context.Context, msg input.Message) er
 	var errs []error
 	for _, s := range core.senders {
 		senderName := s.GetName(ctx)
-		alreadySent, err := core.database.MessageAlreadySent(senderName, msg.ClientMessageID)
+		alreadySent, err := core.Database.MessageAlreadySent(senderName, msg.ClientMessageID)
 		if err != nil {
 			log.WithContext(ctx).Error("failed to run core.database.MessageAlreadySent",
 				zap.Any("sender", senderName),
@@ -74,7 +74,7 @@ func (core *Core) processInputMessage(ctx context.Context, msg input.Message) er
 			zap.String("status", model.MessageSendStatusText(sendStatus)),
 			zap.Any("err", err))
 
-		if err := core.database.MessageMarkSendStatus(senderName, msg, sendStatus); err != nil {
+		if err := core.Database.MessageMarkSendStatus(senderName, msg, sendStatus); err != nil {
 			log.WithContext(ctx).Error("failed to mark message as sent",
 				zap.Any("sender", senderName),
 				zap.Any("client_message_id", msg.ClientMessageID),

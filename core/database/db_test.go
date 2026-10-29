@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -129,6 +130,31 @@ func TestMessageAlreadySent_QueryError(t *testing.T) {
 	assert.EqualError(t, err, "failed to query sender message: query failed")
 }
 
+func TestMessageGetSenderNameList(t *testing.T) {
+	db := newTestDB(t)
+
+	names, err := db.MessageGetSenderNameList()
+	assert.NoError(t, err)
+	assert.Empty(t, names)
+
+	assert.NoError(t, db.MessageMarkSendStatus("alice", input.Message{ClientMessageID: "alice-1"}, model.MessageSendSuccess))
+	assert.NoError(t, db.MessageMarkSendStatus("alice", input.Message{ClientMessageID: "alice-2"}, model.MessageSendSuccess))
+	assert.NoError(t, db.MessageMarkSendStatus("bob", input.Message{ClientMessageID: "bob-1"}, model.MessageSendSuccess))
+
+	names, err = db.MessageGetSenderNameList()
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"alice", "bob"}, names)
+}
+
+func TestMessageGetSenderNameList_QueryError(t *testing.T) {
+	db := newTestDB(t)
+	testDriver.setQueryError(errors.New("query failed"))
+
+	names, err := db.MessageGetSenderNameList()
+	assert.Nil(t, names)
+	assert.EqualError(t, err, "failed to query sender names: query failed")
+}
+
 func TestMessageMarkedAsSent(t *testing.T) {
 	db := newTestDB(t)
 	msg := input.Message{
@@ -219,6 +245,28 @@ func (d *fakeDriver) store(msg model.Message) {
 	}] = msg
 }
 
+func (d *fakeDriver) senderNameRows() [][]driver.Value {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	unique := make(map[string]struct{}, len(d.messages))
+	for _, msg := range d.messages {
+		unique[msg.SenderName] = struct{}{}
+	}
+
+	names := make([]string, 0, len(unique))
+	for name := range unique {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	rows := make([][]driver.Value, 0, len(names))
+	for _, name := range names {
+		rows = append(rows, []driver.Value{name})
+	}
+	return rows
+}
+
 func (d *fakeDriver) Open(string) (driver.Conn, error) {
 	return &fakeConn{driver: d}, nil
 }
@@ -248,6 +296,12 @@ func (c *fakeConn) QueryContext(_ context.Context, query string, args []driver.N
 	}
 
 	query = strings.TrimSpace(query)
+	if strings.HasPrefix(query, "SELECT `sender_name` FROM `messages`") {
+		return &fakeRows{
+			columns: []string{"sender_name"},
+			rows:    c.driver.senderNameRows(),
+		}, nil
+	}
 	if !strings.HasPrefix(query, "SELECT count(*) FROM `messages`") {
 		return nil, fmt.Errorf("unexpected query: %s", query)
 	}

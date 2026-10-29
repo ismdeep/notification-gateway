@@ -33,6 +33,10 @@ type coreTestDatabase struct {
 	marked           []coreTestMark
 }
 
+func (d *coreTestDatabase) MessageGetSenderNameList() ([]string, error) {
+	return nil, nil
+}
+
 type coreTestMark struct {
 	senderName string
 	msg        input.Message
@@ -95,7 +99,7 @@ func TestNewCore(t *testing.T) {
 	if len(core.senders) != 1 || core.senders[0] != sender {
 		t.Fatal("sender was not assigned")
 	}
-	if core.database != db {
+	if core.Database != db {
 		t.Fatal("database was not assigned")
 	}
 }

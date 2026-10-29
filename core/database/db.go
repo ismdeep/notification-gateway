@@ -97,3 +97,11 @@ func (receiver *DB) MessageMarkSendStatus(senderName string, msg input.Message, 
 	}
 	return nil
 }
+
+func (receiver *DB) MessageGetSenderNameList() ([]string, error) {
+	var lst []string
+	if err := receiver.db.Model(&model.Message{}).Select("sender_name").Group("sender_name").Order("sender_name").Scan(&lst).Error; err != nil {
+		return nil, fmt.Errorf("failed to query sender names: %w", err)
+	}
+	return lst, nil
+}

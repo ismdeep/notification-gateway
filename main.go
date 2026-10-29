@@ -90,7 +90,7 @@ func main() {
 	}()
 
 	// 创建 rest 服务
-	r, err := rest.NewRest(ctx, cfg.Rest, inputChan)
+	r, err := rest.NewRest(ctx, cfg.Rest, inputChan, c)
 	if err != nil {
 		panic(fmt.Errorf("failed to create rest server: %w", err))
 	}

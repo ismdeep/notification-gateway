@@ -2,6 +2,7 @@ package rest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/ismdeep/log"
 	"go.uber.org/zap"
 
+	"github.com/ismdeep/notification-gateway/core"
 	"github.com/ismdeep/notification-gateway/core/input"
 )
 
@@ -23,13 +25,16 @@ type Rest struct {
 	inputChan chan input.Message
 	eng       *gin.Engine
 	server    *http.Server
+	core      *core.Core
 }
 
-func NewRest(ctx context.Context, config Config, inputChan chan input.Message) (*Rest, error) {
+func NewRest(ctx context.Context, config Config, inputChan chan input.Message, c *core.Core) (*Rest, error) {
 	r := &Rest{
 		cfg:       config,
 		inputChan: inputChan,
 		eng:       nil,
+		server:    nil,
+		core:      c,
 	}
 	if err := r.initRoute(ctx); err != nil {
 		log.WithContext(ctx).Error("init route failed", zap.Error(err))
@@ -58,6 +63,7 @@ func (r *Rest) initRoute(ctx context.Context) error {
 	}
 
 	r.eng.POST("/api/v1/messages", r.PushMessage)
+	r.eng.GET("/api/v1/sender-names", r.GetSenderNameList)
 	return nil
 }
 
@@ -69,7 +75,7 @@ func (r *Rest) Run(ctx context.Context) error {
 			Handler: r.eng,
 		}
 	}
-	if err := r.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := r.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil

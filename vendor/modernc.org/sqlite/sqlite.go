@@ -71,6 +71,12 @@ var parseTimeFormats = []string{
 	"2006-01-02",
 }
 
+// cancellationFlags maps a connection handle to its conn's canceled flag, which
+// canceledProgress reads. A connection stores its entry on its first call with
+// a context and Close removes it, so the map is not written per call and the
+// lookups of concurrent connections do not contend.
+var cancellationFlags sync.Map // uintptr -> *atomic.Int32
+
 // interruptOnDone sets up a goroutine to interrupt the provided db when the
 // context is canceled, and returns a function the caller must defer so it
 // doesn't interrupt after the caller finishes.
@@ -83,11 +89,26 @@ func interruptOnDone(
 		var d int32
 		done = &d
 	}
+	// SQLite clears an interrupt delivered before the first active VM starts.
+	// Check every 1000 VM steps; shorter statements may still finish after a
+	// lost interrupt. The driver owns the connection's only progress-handler slot.
+	if !c.canceledRegistered {
+		cancellationFlags.Store(c.db, &c.canceled)
+		c.canceledRegistered = true
+	}
+	c.canceled.Store(0)
+	sqlite3.Xsqlite3_progress_handler(c.tls, c.db, 1000, cFuncPointer(canceledProgress), c.db)
 	// donemu prevents a TOCTOU logical race between checking the done flag and
 	// calling interrupt in the select statement below.
 	var donemu sync.Mutex
 
 	donech := make(chan struct{})
+
+	// A wait for a shared-cache lock during the call ends once ctx is done,
+	// see retry; the outer call's context is restored afterwards
+	prevWaitCtx := c.waitCtx
+	c.waitCtx = ctx
+	c.ensureBusyHandler()
 
 	go func() {
 		select {
@@ -97,6 +118,7 @@ func interruptOnDone(
 			// nothing, or even possibly an unrelated later call to exec.
 			donemu.Lock()
 			if atomic.CompareAndSwapInt32(done, 0, 1) {
+				c.canceled.Store(1)
 				c.interrupt(c.db)
 			}
 			donemu.Unlock()
@@ -112,7 +134,16 @@ func interruptOnDone(
 		atomic.StoreInt32(done, 1)
 		donemu.Unlock()
 		close(donech)
+		sqlite3.Xsqlite3_progress_handler(c.tls, c.db, 0, 0, 0)
+		c.waitCtx = prevWaitCtx
 	}
+}
+
+func canceledProgress(_ *libc.TLS, db uintptr) int32 {
+	if flag, ok := cancellationFlags.Load(db); ok {
+		return flag.(*atomic.Int32).Load()
+	}
+	return 0
 }
 
 func getVFSName(query string) (r string, err error) {
@@ -304,6 +335,16 @@ func applyQueryParams(c *conn, query string, defensive bool) error {
 	//
 	// _pragma values are the one exception: they are executed verbatim and
 	// cannot be checked here, so a malformed _pragma can still fail partway.
+	// What can be checked, when StrictPragmas is on, is that each is a single
+	// statement; that check compiles nothing.
+	if strictPragmas.Load() {
+		for _, v := range q["_pragma"] {
+			if !singleStatement(v) {
+				return fmt.Errorf("%w: _pragma=%q", ErrMultiStatementPragma, v)
+			}
+		}
+	}
+
 	busyKey, busyTimeout := dsnPick(q, "_busy_timeout", "_timeout")
 	if busyTimeout != "" {
 		if _, err := strconv.ParseInt(busyTimeout, 10, 64); err != nil {
@@ -487,7 +528,7 @@ func applyQueryParams(c *conn, query string, defensive bool) error {
 func unlockNotify(t *libc.TLS, ppArg uintptr, nArg int32) {
 	for i := int32(0); i < nArg; i++ {
 		mu := *(*uintptr)(unsafe.Pointer(ppArg))
-		(*mutex)(unsafe.Pointer(mu)).Unlock()
+		(*mutex)(unsafe.Pointer(mu)).wake()
 		ppArg += ptrSize
 	}
 }
@@ -696,6 +737,12 @@ type ConnectionHookFn func(
 // invocations: it is valid only for the duration of the call it is passed to
 // and must not be retained past its return.
 type FunctionContext struct {
+	// The type has no methods yet, so a retained *FunctionContext is inert.
+	// Any method added must stay safe when called on a retained one: by
+	// then releaseUDFCall has zeroed it, or the pool has handed it to
+	// another invocation, and ctx is that invocation's sqlite3_context.
+	// Documenting "must not be retained" does not stop a caller from
+	// retaining it.
 	tls *libc.TLS
 	ctx uintptr
 }
